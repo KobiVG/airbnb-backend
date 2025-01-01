@@ -17,28 +17,14 @@ app.use(cors({
 // Middleware to parse JSON requests
 app.use(bodyParser.json());
 
+
+
+
 // Endpoints:
 
 // Home endpoint
 app.get('/', (req, res) => {
     res.send('Welcome to the Camping Booking API!');
-});
-
-// Haal alle campingplekken op
-app.get('/api/camping-spots', (req, res) => {
-    const db = new Database();
-    db.getQuery('SELECT * FROM camping_spots').then((campingSpots) => {
-            res.send(campingSpots);
-        })
-});
-
-// Haal een specifieke campingplek op adhv id
-app.get('/api/camping-spots/:id', (req, res) => {
-    const { id } = req.params; // Haal de id uit de URL
-    const db = new Database();
-    db.getQuery('SELECT * FROM camping_spots WHERE camping_spot_id = ?', [id]).then((campingSpot) => {
-            res.send(campingSpot[0]);
-        })
 });
 
 // Haal (username, email, role) op adhv email
@@ -67,6 +53,25 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
+// Add a new endpoint to fetch all camping spots
+app.get("/api/camping-spots", async (req, res) => {
+    const db = new Database();
+    try {
+      const campingSpots = await db.getQuery(`
+        SELECT 
+          name, 
+          description, 
+          location, 
+          image_path AS image, 
+          price_per_night 
+        FROM camping_spots
+      `);
+      res.status(200).json(campingSpots);
+    } catch (error) {
+      console.error("Error fetching camping spots:", error);
+      res.status(500).json({ error: "Error fetching camping spots." });
+    }
+});
 
 // Login endpoint
 app.post('/api/login', async (req, res) => {
@@ -136,6 +141,27 @@ app.post('/api/register', async (req, res) => {
         res.status(500).json({ message: "Error registering user.", error: error.message });
     }
 });
+
+// Add a new endpoint to handle POST requests for new camping spots
+app.post("/api/camping-spots", (req, res) => {
+    const { name, description, location, price_per_night, image_path } = req.body;
+  
+    const sql = `
+      INSERT INTO camping_spots (name, description, location, price_per_night, image_path)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+  
+    db.query(sql, [name, description, location, price_per_night, image_path], (err, result) => {
+      if (err) {
+        console.error("Error inserting new camping spot:", err);
+        return res.status(500).json({ error: "Error adding camping spot." });
+      }
+      res.status(201).json({ message: "Camping spot added successfully!" });
+    });
+  });
+  
+
+
 
 // Server setup
 app.listen(3000, () => {
