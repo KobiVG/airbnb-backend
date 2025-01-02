@@ -73,6 +73,65 @@ app.get("/api/camping-spots", async (req, res) => {
     }
 });
 
+// Endpoint to fetch all camping spots owned by a specific user (owner)
+app.get('/api/owner-camping-spots/:userId', async (req, res) => {
+    const { userId } = req.params; // Get the userId from the request params
+
+    const db = new Database();
+
+    try {
+        // Query to get camping spots owned by the user (match with owner_user_id)
+        const ownerCampingSpotsQuery = await db.getQuery(`
+            SELECT 
+                name, 
+                description, 
+                location, 
+                image_path AS image, 
+                price_per_night 
+            FROM camping_spots 
+            WHERE owner_user_id = ?
+        `, [userId]);
+
+        if (ownerCampingSpotsQuery.length === 0) {
+            return res.status(404).json({ message: "Geen campings gevonden voor deze eigenaar." });
+        }
+
+        res.status(200).json(ownerCampingSpotsQuery); // Return the camping spots
+    } catch (error) {
+        console.error("Error fetching owner's camping spots:", error);
+        res.status(500).json({ error: "Er is een fout opgetreden bij het ophalen van de campings." });
+    }
+});
+
+
+// Endpoint om alle boekingen van een specifieke gebruiker op te halen
+app.get('/api/user-bookings/:userId', async (req, res) => {
+    const { userId } = req.params;
+
+    const db = new Database();
+    // Query om de boekingen van de gebruiker en bijbehorende camping details op te halen
+    const bookingsQuery = await db.getQuery(`
+        SELECT 
+            b.booking_id,
+            b.check_in_date,
+            b.check_out_date,
+            b.status,
+            cs.name AS camping_name,
+            cs.location AS camping_location,
+            cs.price_per_night
+        FROM bookings b
+        JOIN camping_spots cs ON b.camping_spot_id = cs.camping_spot_id
+        WHERE b.user_id = ?
+        ORDER BY b.check_in_date DESC
+    `, [userId]);
+
+    if (bookingsQuery.length === 0) {
+        return res.status(404).json({ message: "Geen boekingen gevonden voor deze gebruiker." });
+    }
+
+    res.status(200).json(bookingsQuery);
+});
+
 // Login endpoint
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
@@ -98,8 +157,16 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Onjuist email of wachtwoord.' });
         }
 
-        // Login succesvol
-        res.status(200).json({ message: 'Login succesvol', userId: user.id });
+        // Login succesvol, stuur userId, username, email en role terug
+        const response = {
+            message: 'Login succesvol',
+            userId: user.user_id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+        };
+        console.log('Login Response:', response); // Log the response here
+        res.status(200).json(response);
     } catch (error) {
         console.error('Login fout:', error);
         res.status(500).json({ error: 'Interne serverfout.' });
