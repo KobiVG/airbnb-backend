@@ -83,6 +83,7 @@ app.get('/api/owner-camping-spots/:userId', async (req, res) => {
         // Query to get camping spots owned by the user (match with owner_user_id)
         const ownerCampingSpotsQuery = await db.getQuery(`
             SELECT 
+                camping_spot_id,
                 name, 
                 description, 
                 location, 
@@ -226,6 +227,51 @@ app.post("/api/camping-spots", (req, res) => {
       res.status(201).json({ message: "Camping spot added successfully!" });
     });
   });
+
+  // delete camping spot
+  app.delete('/api/camping-spot/:campingId', async (req, res) => {
+    const { campingId } = req.params;
+    const db = new Database();
+
+    try {
+        // First, delete the related reviews
+        await db.getQuery(`
+            DELETE FROM reviews 
+            WHERE camping_spot_id = ?
+        `, [campingId]);
+
+        // Second, delete the related bookings
+        await db.getQuery(`
+            DELETE FROM bookings 
+            WHERE camping_spot_id = ?
+        `, [campingId]);
+
+        // Third, delete the related availabilities
+        await db.getQuery(`
+            DELETE FROM availabilities 
+            WHERE camping_spot_id = ?
+        `, [campingId]);
+
+        // Now delete the camping spot itself
+        const result = await db.getQuery(`
+            DELETE FROM camping_spots 
+            WHERE camping_spot_id = ?
+        `, [campingId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Camping spot not found" });
+        }
+
+        console.log("Deletion result:", result);
+        res.status(200).json({ message: "Camping spot deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting camping spot:", error);
+        res.status(500).json({ error: "Error deleting camping spot" });
+    }
+});
+
+
+
   
 
 
