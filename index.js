@@ -270,6 +270,58 @@ app.post("/api/camping-spots", (req, res) => {
     }
 });
 
+// Update user information endpoint
+app.put('/api/users/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const { username, email, role } = req.body; // Optional fields
+
+    if (!username && !email && !role) {
+        return res.status(400).json({ error: 'At least one field must be provided for update.' });
+    }
+
+    const db = new Database();
+
+    try {
+        // Construct the dynamic query based on provided fields
+        const updates = [];
+        const values = [];
+
+        if (username) {
+            updates.push('username = ?');
+            values.push(username);
+        }
+        if (email) {
+            updates.push('email = ?');
+            values.push(email);
+        }
+        if (role) {
+            updates.push('role = ?');
+            values.push(role);
+        }
+
+        values.push(userId); // Add userId for the WHERE clause
+        const updateQuery = `
+            UPDATE users 
+            SET ${updates.join(', ')}, updated_at = NOW()
+            WHERE user_id = ?
+        `;
+
+        const result = await db.getQuery(updateQuery, values);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        res.status(200).json({ message: 'User information updated successfully.' });
+    } catch (error) {
+        console.error('Error updating user information:', error);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+});
+
+
+
+
 
 
   
