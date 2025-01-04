@@ -1,8 +1,11 @@
 // Importing the express module and other required packages
 const express = require('express');
+const multer = require('multer');
+const path = require('path');  // This will resolve the 'path' is not defined error.
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const Database = require('./classes/database.js');
+
 
 // Create an express app
 const app = express();
@@ -16,6 +19,22 @@ app.use(cors({
 
 // Middleware to parse JSON requests
 app.use(bodyParser.json());
+
+// Set up the storage engine for multer
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      // The 'uploads' folder is where your images are stored
+      cb(null, path.join(__dirname, 'uploads'));
+    },
+    filename: (req, file, cb) => {
+      // Use a unique name for the file (e.g., current timestamp + file extension)
+      cb(null, Date.now() + path.extname(file.originalname));
+    }
+  });
+  const upload = multer({ storage });
+  // Serve static files from the 'uploads' directory
+  // This makes all files in the 'uploads' folder accessible through /uploads/...
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 
@@ -58,7 +77,8 @@ app.get("/api/camping-spots", async (req, res) => {
     const db = new Database();
     try {
       const campingSpots = await db.getQuery(`
-        SELECT 
+        SELECT
+          camping_spot_id as id, 
           name, 
           description, 
           location, 
@@ -210,23 +230,59 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// Add a new endpoint to handle POST requests for new camping spots
-app.post("/api/camping-spots", (req, res) => {
-    const { name, description, location, price_per_night, image_path } = req.body;
-  
+// Endpoint to handle adding new camping spots with image upload
+app.post('/api/camping-spots', upload.single('image'), async (req, res) => {
+    // Save the image path in the database
+    const imagePath = req.file ? `/uploads/${req.file.filename.replace(/\\/g, '/')}` : null;
+    const db = new Database();  // Create an instance of Database here
+
+    const { name, description, location, price_per_night, owner_user_id } = req.body; // Extract owner_user_id from the request body
+
+    if (!name || !description || !location || !price_per_night || !owner_user_id) {
+        return res.status(400).json({ error: "All fields are required, including owner_user_id." });
+    }
+
+    // Modify the SQL to include owner_user_id
     const sql = `
-      INSERT INTO camping_spots (name, description, location, price_per_night, image_path)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO camping_spots (name, description, location, price_per_night, image_path, owner_user_id)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
-  
-    db.query(sql, [name, description, location, price_per_night, image_path], (err, result) => {
-      if (err) {
+
+    try {
+        await db.getQuery(sql, [name, description, location, price_per_night, imagePath, owner_user_id]);
+        res.status(201).json({ message: "Camping spot added successfully!" });
+    } catch (err) {
         console.error("Error inserting new camping spot:", err);
-        return res.status(500).json({ error: "Error adding camping spot." });
-      }
-      res.status(201).json({ message: "Camping spot added successfully!" });
-    });
-  });
+        res.status(500).json({ error: "Error adding camping spot." });
+    }
+});
+
+
+  // Add a new endpoint to handle bookings
+app.post('/api/book-camping', async (req, res) => {
+    const { userId, campingSpotId, checkInDate, checkOutDate } = req.body;
+
+    if (!userId || !campingSpotId || !checkInDate || !checkOutDate) {
+        return res.status(400).json({ error: 'All fields are required for booking.' });
+    }
+
+    const db = new Database();
+
+    try {
+        // Insert the booking into the database
+        const bookingQuery = `
+            INSERT INTO bookings (user_id, camping_spot_id, check_in_date, check_out_date, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'confirmed', NOW(), NOW())
+        `;
+
+        await db.getQuery(bookingQuery, [userId, campingSpotId, checkInDate, checkOutDate]);
+
+        res.status(201).json({ message: 'Booking successful!' });
+    } catch (error) {
+        console.error('Error creating booking:', error);
+        res.status(500).json({ error: 'An error occurred while creating the booking.' });
+    }
+});
 
   // delete camping spot
   app.delete('/api/camping-spot/:campingId', async (req, res) => {
