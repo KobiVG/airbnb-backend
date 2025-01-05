@@ -223,7 +223,7 @@ app.post('/api/register', async (req, res) => {
         console.log("Executing query:", query, [username, email, password, role]);  // Log query
         await db.getQuery(query, [username, email, password, role]);
 
-        res.status(201).json({ message: "User registered successfully." });
+        res.status(201).end();
     } catch (error) {
         console.error("Error registering user:", error); // Log the full error
         res.status(500).json({ message: "Error registering user.", error: error.message });
@@ -250,7 +250,7 @@ app.post('/api/camping-spots', upload.single('image'), async (req, res) => {
 
     try {
         await db.getQuery(sql, [name, description, location, price_per_night, imagePath, owner_user_id]);
-        res.status(201).json({ message: "Camping spot added successfully!" });
+        res.status(201).end();
     } catch (err) {
         console.error("Error inserting new camping spot:", err);
         res.status(500).json({ error: "Error adding camping spot." });
@@ -277,7 +277,7 @@ app.post('/api/book-camping', async (req, res) => {
 
         await db.getQuery(bookingQuery, [userId, campingSpotId, checkInDate, checkOutDate]);
 
-        res.status(201).json({ message: 'Booking successful!' });
+        res.status(201).end();
     } catch (error) {
         console.error('Error creating booking:', error);
         res.status(500).json({ error: 'An error occurred while creating the booking.' });
